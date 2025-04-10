@@ -39,7 +39,8 @@ const Visualize = () => {
   const dayLengthData = astronomicalData.map(item => ({
     location: item.location,
     dayLength: Math.round(item.day_length / 60), // Convert seconds to minutes
-    peopleInSpace: item.people_in_space
+    peopleInSpace: item.people_in_space || 0,
+    source: item.source
   }));
 
   return (
@@ -84,18 +85,18 @@ const Visualize = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>People in Space by Query Date</CardTitle>
+                  <CardTitle>Data Sources Distribution</CardTitle>
                 </CardHeader>
                 <CardContent className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={astronomicalData}>
+                    <BarChart data={astronomicalData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
+                      <XAxis dataKey="source" />
                       <YAxis />
                       <Tooltip />
                       <Legend />
-                      <Line type="monotone" dataKey="people_in_space" stroke="#82ca9d" name="People in Space" />
-                    </LineChart>
+                      <Bar dataKey="day_length" stroke="#82ca9d" name="Data Points" fill="#82ca9d" />
+                    </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
@@ -115,8 +116,7 @@ const Visualize = () => {
                         <th className="p-2 text-left">Sunrise</th>
                         <th className="p-2 text-left">Sunset</th>
                         <th className="p-2 text-left">Day Length (min)</th>
-                        <th className="p-2 text-left">ISS Passes</th>
-                        <th className="p-2 text-left">People in Space</th>
+                        <th className="p-2 text-left">Source</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -127,8 +127,7 @@ const Visualize = () => {
                           <td className="p-2">{new Date(item.sunrise).toLocaleTimeString()}</td>
                           <td className="p-2">{new Date(item.sunset).toLocaleTimeString()}</td>
                           <td className="p-2">{Math.round(item.day_length / 60)}</td>
-                          <td className="p-2">{item.iss_passes || "N/A"}</td>
-                          <td className="p-2">{item.people_in_space}</td>
+                          <td className="p-2">{item.source}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -46,14 +46,9 @@ const Conclusions = () => {
       if (scoringMethod === "dayLength") {
         // Longer day length is better (max approx 43200 seconds or 12 hours)
         score = (item.day_length / 43200) * 100;
-      } else if (scoringMethod === "issPasses") {
-        // More ISS passes is better (typical range 0-5)
-        score = item.iss_passes ? (item.iss_passes / 5) * 100 : 0;
       } else if (scoringMethod === "combined") {
-        // Combined score
-        const dayLengthScore = (item.day_length / 43200) * 100;
-        const issPassesScore = item.iss_passes ? (item.iss_passes / 5) * 100 : 0;
-        score = (dayLengthScore * 0.7) + (issPassesScore * 0.3); // 70% day length, 30% ISS passes
+        // Combined score - just use day length for now since we removed ISS passes
+        score = (item.day_length / 43200) * 100;
       }
 
       return {
@@ -61,8 +56,7 @@ const Conclusions = () => {
         date: new Date(item.date).toLocaleDateString(),
         score: Math.min(Math.round(score), 100), // Cap at 100
         dayLength: Math.round(item.day_length / 60), // in minutes
-        issPasses: item.iss_passes || 0,
-        peopleInSpace: item.people_in_space,
+        source: item.source
       };
     }).sort((a, b) => b.score - a.score); // Sort by score descending
   };
@@ -106,12 +100,8 @@ const Conclusions = () => {
                     <Label htmlFor="dayLength">Day Length (longer days score higher)</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="issPasses" id="issPasses" />
-                    <Label htmlFor="issPasses">ISS Passes (more passes score higher)</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
                     <RadioGroupItem value="combined" id="combined" />
-                    <Label htmlFor="combined">Combined Score (70% day length, 30% ISS passes)</Label>
+                    <Label htmlFor="combined">Combined Score (based on available metrics)</Label>
                   </div>
                 </RadioGroup>
               </CardContent>
@@ -126,6 +116,7 @@ const Conclusions = () => {
                   <div className="text-center mb-4">
                     <h3 className="text-2xl font-bold text-indigo-700">{bestLocation.location}</h3>
                     <p className="text-gray-600">Date: {bestLocation.date}</p>
+                    <p className="text-gray-600">Source: {bestLocation.source}</p>
                   </div>
                   <div className="space-y-4">
                     <div>
@@ -139,14 +130,6 @@ const Conclusions = () => {
                       <div className="bg-white p-4 rounded-lg shadow-sm">
                         <p className="text-gray-500 text-sm">Day Length</p>
                         <p className="text-lg font-semibold">{bestLocation.dayLength} minutes</p>
-                      </div>
-                      <div className="bg-white p-4 rounded-lg shadow-sm">
-                        <p className="text-gray-500 text-sm">ISS Passes</p>
-                        <p className="text-lg font-semibold">{bestLocation.issPasses}</p>
-                      </div>
-                      <div className="bg-white p-4 rounded-lg shadow-sm">
-                        <p className="text-gray-500 text-sm">People in Space</p>
-                        <p className="text-lg font-semibold">{bestLocation.peopleInSpace}</p>
                       </div>
                     </div>
                   </div>
@@ -170,15 +153,12 @@ const Conclusions = () => {
                         <span className="font-bold">{item.score}%</span>
                       </div>
                       <Progress value={item.score} className="h-2 mb-2" />
-                      <div className="grid grid-cols-3 gap-2 text-sm mt-2">
+                      <div className="grid grid-cols-2 gap-2 text-sm mt-2">
                         <div className="text-gray-600">
                           Day Length: {item.dayLength} min
                         </div>
                         <div className="text-gray-600">
-                          ISS Passes: {item.issPasses}
-                        </div>
-                        <div className="text-gray-600">
-                          People in Space: {item.peopleInSpace}
+                          Data Source: {item.source}
                         </div>
                       </div>
                     </div>

@@ -29,7 +29,7 @@ const Index = () => {
       const latitude = 40.7128; // Example: NYC
       const longitude = -74.006;
       
-      // Fetch sunrise/sunset data
+      // Fetch sunrise/sunset data from primary API
       const sunriseResponse = await fetch(
         `https://api.sunrise-sunset.org/json?lat=${latitude}&lng=${longitude}&formatted=0`
       );
@@ -39,23 +39,13 @@ const Index = () => {
         throw new Error("Failed to fetch sunrise/sunset data");
       }
       
-      // Fetch ISS pass data
-      const issResponse = await fetch(
-        `http://api.open-notify.org/iss-pass.json?lat=${latitude}&lon=${longitude}`
-      );
-      const issData = await issResponse.json();
-      
-      // Fetch people in space data
-      const peopleResponse = await fetch("http://api.open-notify.org/astros.json");
-      const peopleData = await peopleResponse.json();
-      
       // Format the date
       const today = new Date().toISOString().split('T')[0];
       
       // Calculate day length in seconds
       const sunrise = new Date(sunriseData.results.sunrise);
       const sunset = new Date(sunriseData.results.sunset);
-      const dayLengthSeconds = Math.floor((sunset - sunrise) / 1000);
+      const dayLengthSeconds = Math.floor((sunset.getTime() - sunrise.getTime()) / 1000);
       
       // Prepare data for database
       const astronomicalData = {
@@ -67,13 +57,11 @@ const Index = () => {
         sunset: sunriseData.results.sunset,
         day_length: dayLengthSeconds,
         solar_noon: sunriseData.results.solar_noon,
-        iss_passes: issData.response ? issData.response.length : null,
-        iss_next_pass: issData.response && issData.response.length > 0 
-          ? new Date(issData.response[0].risetime * 1000).toISOString() 
-          : null,
-        people_in_space: peopleData.number,
-        people_details: peopleData.people,
-        source: "API Query"
+        iss_passes: 0,  // Default value since API is not available
+        iss_next_pass: null,
+        people_in_space: 0,  // Default value since API is not available
+        people_details: null,
+        source: "sunrise-sunset.org"
       };
       
       // Store in Supabase
