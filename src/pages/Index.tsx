@@ -46,41 +46,42 @@ const Index = () => {
       const formattedDate = format(date, "yyyy-MM-dd");
       
       // Fetch astronomical data from APIs
-      const apiResponse = await fetchSunriseSunsetData(lat, lng, formattedDate);
+      const apiResponses = await fetchSunriseSunsetData(lat, lng, formattedDate);
       
-      if (!apiResponse) {
+      if (!apiResponses || apiResponses.length === 0) {
         throw new Error("Failed to fetch astronomical data");
       }
       
-      const { data: sunriseData, source } = apiResponse;
-      
-      // Prepare data for database
-      const astronomicalData = {
-        location: location,
-        latitude: lat,
-        longitude: lng,
-        date: formattedDate,
-        sunrise: sunriseData.sunrise,
-        sunset: sunriseData.sunset,
-        day_length: sunriseData.day_length,
-        solar_noon: sunriseData.solar_noon,
-        iss_passes: 0,  // Default value since API is not available
-        iss_next_pass: null,
-        people_in_space: 0,  // Default value since API is not available
-        people_details: null,
-        source: source
-      };
-      
-      // Store in Supabase
-      const { error } = await supabase
-        .from('astronomical_data')
-        .insert([astronomicalData]);
+      // Store each API result separately in the database
+      for (const response of apiResponses) {
+        const astronomicalData = {
+          location: location,
+          latitude: lat,
+          longitude: lng,
+          date: formattedDate,
+          sunrise: response.data.sunrise,
+          sunset: response.data.sunset,
+          day_length: response.data.day_length,
+          solar_noon: response.data.solar_noon,
+          iss_passes: 0,  // Default value since API is not available
+          iss_next_pass: null,
+          people_in_space: 0,  // Default value since API is not available
+          people_details: null,
+          source: response.source
+        };
         
-      if (error) throw error;
+        const { error } = await supabase
+          .from('astronomical_data')
+          .insert([astronomicalData]);
+          
+        if (error) {
+          console.error(`Error saving ${response.source} data:`, error);
+        }
+      }
       
       toast({
         title: "Success",
-        description: "Astronomical data collected successfully!",
+        description: `Collected astronomical data from ${apiResponses.length} source(s) successfully!`,
       });
       
       // Navigate to visualization page

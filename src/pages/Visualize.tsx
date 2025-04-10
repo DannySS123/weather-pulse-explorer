@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -169,13 +168,10 @@ const Visualize = () => {
     };
   }, [astronomicalData]);
 
-  // Improved sorting function with multiple columns and direction
   const handleSort = (column: SortableColumn) => {
     if (sortBy === column) {
-      // Toggle sort order if clicking the same column
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
-      // Set new column and default to ascending
       setSortBy(column);
       setSortOrder("asc");
     }
@@ -194,7 +190,6 @@ const Visualize = () => {
       else if (sortBy === "sunset") comparison = a.sunset.localeCompare(b.sunset);
       else if (sortBy === "source") comparison = a.source.localeCompare(b.source);
       
-      // Reverse for descending order
       return sortOrder === "asc" ? comparison : -comparison;
     });
   }, [processedData, sortBy, sortOrder]);
@@ -212,7 +207,6 @@ const Visualize = () => {
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
-  // Type-safe tooltip renderer
   const renderCustomTooltipContent = (props: RechartTooltipProps<number, string>) => {
     const { payload } = props;
     if (!payload || payload.length === 0) return null;
@@ -223,14 +217,16 @@ const Visualize = () => {
     const name = data.name;
     const value = data.value;
     
-    // Convert percent to number safely before using toFixed
-    const percent = typeof data.percent === 'number' 
-      ? (data.percent * 100).toFixed(0) 
-      : '0';
+    let percentText = '0%';
+    if (typeof data.payload.percent === 'number') {
+      percentText = `${(data.payload.percent * 100).toFixed(0)}%`;
+    } else if (data.payload.percent !== undefined) {
+      percentText = String(data.payload.percent);
+    }
     
     return (
       <div className="bg-white p-2 shadow rounded">
-        <p>{`${name}: ${percent}%`}</p>
+        <p>{`${name}: ${percentText}`}</p>
       </div>
     );
   };
@@ -348,7 +344,7 @@ const Visualize = () => {
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip />
+                          <Tooltip content={renderCustomTooltipContent} />
                         </PieChart>
                       </ResponsiveContainer>
                     )}
