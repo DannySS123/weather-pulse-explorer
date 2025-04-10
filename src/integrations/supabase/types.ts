@@ -9,7 +9,60 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      astronomical_data: {
+        Row: {
+          created_at: string
+          date: string
+          day_length: number
+          id: string
+          iss_next_pass: string | null
+          iss_passes: number | null
+          latitude: number
+          location: string
+          longitude: number
+          people_details: Json | null
+          people_in_space: number | null
+          solar_noon: string
+          source: string
+          sunrise: string
+          sunset: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          day_length: number
+          id?: string
+          iss_next_pass?: string | null
+          iss_passes?: number | null
+          latitude: number
+          location: string
+          longitude: number
+          people_details?: Json | null
+          people_in_space?: number | null
+          solar_noon: string
+          source: string
+          sunrise: string
+          sunset: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          day_length?: number
+          id?: string
+          iss_next_pass?: string | null
+          iss_passes?: number | null
+          latitude?: number
+          location?: string
+          longitude?: number
+          people_details?: Json | null
+          people_in_space?: number | null
+          solar_noon?: string
+          source?: string
+          sunrise?: string
+          sunset?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
