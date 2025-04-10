@@ -5,6 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
+import { ArrowUpDown } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface AstronomicalDataItem {
   id: string;
@@ -27,9 +36,13 @@ interface LocationScore {
   samples: number;
 }
 
+type SortableColumn = "rank" | "location" | "dayLength" | "score" | "samples";
+
 const Conclusions = () => {
   const [astronomicalData, setAstronomicalData] = useState<AstronomicalDataItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [sortBy, setSortBy] = useState<SortableColumn>("score");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -82,11 +95,41 @@ const Conclusions = () => {
       };
     });
 
-    // Sort by score (descending)
-    return locationScores.sort((a, b) => b.score - a.score);
+    return locationScores;
   };
 
-  const conclusionsData = conclusions();
+  // Handle sorting
+  const handleSort = (column: SortableColumn) => {
+    if (sortBy === column) {
+      // Toggle sort order if clicking the same column
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      // Set new column and default to descending for most metrics
+      setSortBy(column);
+      setSortOrder(column === "location" ? "asc" : "desc");
+    }
+  };
+
+  // Apply sorting
+  const sortedConclusionsData = (): LocationScore[] => {
+    const data = conclusions();
+    
+    if (data.length === 0) return [];
+    
+    return [...data].sort((a, b) => {
+      let comparison = 0;
+      
+      if (sortBy === "location") comparison = a.location.localeCompare(b.location);
+      else if (sortBy === "dayLength") comparison = a.dayLength - b.dayLength;
+      else if (sortBy === "score") comparison = a.score - b.score;
+      else if (sortBy === "samples") comparison = a.samples - b.samples;
+      
+      // Reverse for descending order
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+  };
+
+  const conclusionsData = sortedConclusionsData();
   const bestLocation = conclusionsData.length > 0 ? conclusionsData[0] : null;
 
   return (
@@ -134,30 +177,53 @@ const Conclusions = () => {
                   <CardTitle>Location Rankings by Daylight</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="p-2 text-left">Rank</th>
-                          <th className="p-2 text-left">Location</th>
-                          <th className="p-2 text-left">Average Day Length</th>
-                          <th className="p-2 text-left">Score</th>
-                          <th className="p-2 text-left">Samples</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {conclusionsData.map((item, index) => (
-                          <tr key={item.location} className={`border-b ${index === 0 ? 'bg-primary/5' : ''}`}>
-                            <td className="p-2 font-medium">{index + 1}</td>
-                            <td className="p-2">{item.location}</td>
-                            <td className="p-2">{item.dayLength} minutes</td>
-                            <td className="p-2">{item.score}</td>
-                            <td className="p-2">{item.samples}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead onClick={() => handleSort("rank")} className="cursor-pointer w-16">
+                          <div className="flex items-center">
+                            Rank
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          </div>
+                        </TableHead>
+                        <TableHead onClick={() => handleSort("location")} className="cursor-pointer">
+                          <div className="flex items-center">
+                            Location
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          </div>
+                        </TableHead>
+                        <TableHead onClick={() => handleSort("dayLength")} className="cursor-pointer">
+                          <div className="flex items-center">
+                            Average Day Length
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          </div>
+                        </TableHead>
+                        <TableHead onClick={() => handleSort("score")} className="cursor-pointer">
+                          <div className="flex items-center">
+                            Score
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          </div>
+                        </TableHead>
+                        <TableHead onClick={() => handleSort("samples")} className="cursor-pointer">
+                          <div className="flex items-center">
+                            Samples
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          </div>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {conclusionsData.map((item, index) => (
+                        <TableRow key={item.location} className={index === 0 ? 'bg-primary/5' : ''}>
+                          <TableCell className="font-medium">{index + 1}</TableCell>
+                          <TableCell>{item.location}</TableCell>
+                          <TableCell>{item.dayLength} minutes</TableCell>
+                          <TableCell>{item.score}</TableCell>
+                          <TableCell>{item.samples}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </>

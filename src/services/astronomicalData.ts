@@ -32,22 +32,46 @@ interface SunriseSunsetIoApiResponse {
   status: string;
 }
 
+interface AstronomicalDataResult {
+  data: {
+    sunrise: string;
+    sunset: string;
+    day_length: number;
+    solar_noon: string;
+  };
+  source: string;
+}
+
 export const fetchSunriseSunsetData = async (
   latitude: number,
   longitude: number,
   date: string
-): Promise<{ data: any; source: string } | null> => {
+): Promise<AstronomicalDataResult[]> => {
+  const results: AstronomicalDataResult[] = [];
+  
   try {
-    // Try the primary API first (sunrise-sunset.org)
-    const sunriseResponse = await fetch(
+    // Start both API requests simultaneously
+    const primaryApiPromise = fetch(
       `https://api.sunrise-sunset.org/json?lat=${latitude}&lng=${longitude}&date=${date}&formatted=0`
     );
     
-    if (sunriseResponse.ok) {
-      const data = await sunriseResponse.json() as SunriseSunsetApiResponse;
+    const formattedDate = date.replace(/-/g, "/");
+    const backupApiPromise = fetch(
+      `https://api.sunrisesunset.io/json?lat=${latitude}&lng=${longitude}&date=${formattedDate}`
+    );
+    
+    // Wait for both promises to resolve
+    const [primaryResponse, backupResponse] = await Promise.allSettled([
+      primaryApiPromise,
+      backupApiPromise
+    ]);
+    
+    // Process primary API response
+    if (primaryResponse.status === 'fulfilled' && primaryResponse.value.ok) {
+      const data = await primaryResponse.value.json() as SunriseSunsetApiResponse;
       
       if (data.status === "OK") {
-        return {
+        results.push({
           data: {
             sunrise: data.results.sunrise,
             sunset: data.results.sunset,
@@ -55,48 +79,47 @@ export const fetchSunriseSunsetData = async (
             solar_noon: data.results.solar_noon
           },
           source: "sunrise-sunset.org"
-        };
+        });
       }
     }
     
-    throw new Error("Primary API failed");
-  } catch (error) {
-    // If primary API fails, try the backup API (sunrisesunset.io)
-    try {
-      const formattedDate = date.replace(/-/g, "/");
-      const backupResponse = await fetch(
-        `https://api.sunrisesunset.io/json?lat=${latitude}&lng=${longitude}&date=${formattedDate}`
-      );
+    // Process backup API response
+    if (backupResponse.status === 'fulfilled' && backupResponse.value.ok) {
+      const data = await backupResponse.value.json() as SunriseSunsetIoApiResponse;
       
-      if (backupResponse.ok) {
-        const data = await backupResponse.json() as SunriseSunsetIoApiResponse;
+      if (data.status === "OK") {
+        // Convert day_length from "HH:MM:SS" to seconds
+        const [hours, minutes, seconds] = data.day_length.split(':').map(Number);
+        const dayLengthSeconds = (hours * 3600) + (minutes * 60) + seconds;
         
-        if (data.status === "OK") {
-          // Convert day_length from "HH:MM:SS" to seconds
-          const [hours, minutes, seconds] = data.day_length.split(':').map(Number);
-          const dayLengthSeconds = (hours * 3600) + (minutes * 60) + seconds;
-          
-          return {
-            data: {
-              sunrise: new Date(`${date}T${data.sunrise}${data.utc_offset >= 0 ? '+' : '-'}${Math.abs(data.utc_offset)}:00`).toISOString(),
-              sunset: new Date(`${date}T${data.sunset}${data.utc_offset >= 0 ? '+' : '-'}${Math.abs(data.utc_offset)}:00`).toISOString(),
-              day_length: dayLengthSeconds,
-              solar_noon: new Date(`${date}T${data.solar_noon}${data.utc_offset >= 0 ? '+' : '-'}${Math.abs(data.utc_offset)}:00`).toISOString()
-            },
-            source: "sunrisesunset.io"
-          };
-        }
+        results.push({
+          data: {
+            sunrise: new Date(`${date}T${data.sunrise}${data.utc_offset >= 0 ? '+' : '-'}${Math.abs(data.utc_offset)}:00`).toISOString(),
+            sunset: new Date(`${date}T${data.sunset}${data.utc_offset >= 0 ? '+' : '-'}${Math.abs(data.utc_offset)}:00`).toISOString(),
+            day_length: dayLengthSeconds,
+            solar_noon: new Date(`${date}T${data.solar_noon}${data.utc_offset >= 0 ? '+' : '-'}${Math.abs(data.utc_offset)}:00`).toISOString()
+          },
+          source: "sunrisesunset.io"
+        });
       }
-      
-      throw new Error("Backup API failed");
-    } catch (backupError) {
-      console.error("Error fetching data from both APIs:", backupError);
+    }
+    
+    if (results.length === 0) {
       toast({
         title: "API Error",
         description: "Failed to fetch data from astronomical APIs",
         variant: "destructive",
       });
-      return null;
     }
+    
+    return results;
+  } catch (error) {
+    console.error("Error fetching data from APIs:", error);
+    toast({
+      title: "API Error",
+      description: "Failed to fetch data from astronomical APIs",
+      variant: "destructive",
+    });
+    return [];
   }
 };

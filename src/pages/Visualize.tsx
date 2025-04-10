@@ -1,10 +1,11 @@
+
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
-  BarChart, Bar, PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis, TooltipProps
+  BarChart, Bar, PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis, TooltipProps as RechartTooltipProps
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -16,6 +17,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Sun, Moon, ArrowUpDown } from "lucide-react";
 
 interface AstronomicalData {
   id: string;
@@ -67,10 +77,13 @@ interface ScatterDataPoint {
   name: string;
 }
 
+type SortableColumn = "location" | "date" | "day_length" | "sunrise" | "sunset" | "source";
+
 const Visualize = () => {
   const [astronomicalData, setAstronomicalData] = useState<AstronomicalData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<"location" | "date" | "day_length">("date");
+  const [sortBy, setSortBy] = useState<SortableColumn>("date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -156,16 +169,35 @@ const Visualize = () => {
     };
   }, [astronomicalData]);
 
+  // Improved sorting function with multiple columns and direction
+  const handleSort = (column: SortableColumn) => {
+    if (sortBy === column) {
+      // Toggle sort order if clicking the same column
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      // Set new column and default to ascending
+      setSortBy(column);
+      setSortOrder("asc");
+    }
+  };
+
   const sortedData = useMemo(() => {
     if (!processedData.length) return [];
     
     return [...processedData].sort((a, b) => {
-      if (sortBy === "location") return a.location.localeCompare(b.location);
-      if (sortBy === "date") return new Date(b.date).getTime() - new Date(a.date).getTime();
-      if (sortBy === "day_length") return b.dayLength - a.dayLength;
-      return 0;
+      let comparison = 0;
+      
+      if (sortBy === "location") comparison = a.location.localeCompare(b.location);
+      else if (sortBy === "date") comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
+      else if (sortBy === "day_length") comparison = a.dayLength - b.dayLength;
+      else if (sortBy === "sunrise") comparison = a.sunrise.localeCompare(b.sunrise);
+      else if (sortBy === "sunset") comparison = a.sunset.localeCompare(b.sunset);
+      else if (sortBy === "source") comparison = a.source.localeCompare(b.source);
+      
+      // Reverse for descending order
+      return sortOrder === "asc" ? comparison : -comparison;
     });
-  }, [processedData, sortBy]);
+  }, [processedData, sortBy, sortOrder]);
 
   const scatterData = useMemo(() => {
     if (!astronomicalData.length) return [];
@@ -180,7 +212,8 @@ const Visualize = () => {
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
-  const renderCustomTooltipContent = (props: TooltipProps) => {
+  // Type-safe tooltip renderer
+  const renderCustomTooltipContent = (props: RechartTooltipProps<number, string>) => {
     const { payload } = props;
     if (!payload || payload.length === 0) return null;
     
@@ -190,6 +223,7 @@ const Visualize = () => {
     const name = data.name;
     const value = data.value;
     
+    // Convert percent to number safely before using toFixed
     const percent = typeof data.percent === 'number' 
       ? (data.percent * 100).toFixed(0) 
       : '0';
@@ -209,16 +243,7 @@ const Visualize = () => {
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold">Astronomical Data Visualization</h1>
             <div className="flex items-center gap-4">
-              <Select value={sortBy} onValueChange={(value) => setSortBy(value as any)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="date">Sort by Date</SelectItem>
-                  <SelectItem value="location">Sort by Location</SelectItem>
-                  <SelectItem value="day_length">Sort by Day Length</SelectItem>
-                </SelectContent>
-              </Select>
+              <Button onClick={() => navigate("/conclusions")}>View Conclusions</Button>
               <Button onClick={() => navigate("/")}>Back to Search</Button>
             </div>
           </div>
@@ -239,8 +264,11 @@ const Visualize = () => {
               {stats && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                   <Card>
-                    <CardHeader>
-                      <CardTitle>Average Day Length</CardTitle>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2">
+                        <Sun className="h-5 w-5 text-yellow-500" />
+                        Average Day Length
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="text-center">
                       <div className="text-4xl font-bold">{stats.avgDayLength}</div>
@@ -248,8 +276,11 @@ const Visualize = () => {
                     </CardContent>
                   </Card>
                   <Card>
-                    <CardHeader>
-                      <CardTitle>Maximum Day Length</CardTitle>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2">
+                        <Sun className="h-5 w-5 text-orange-500" />
+                        Maximum Day Length
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="text-center">
                       <div className="text-4xl font-bold">{stats.maxDayLength}</div>
@@ -257,8 +288,11 @@ const Visualize = () => {
                     </CardContent>
                   </Card>
                   <Card>
-                    <CardHeader>
-                      <CardTitle>Minimum Day Length</CardTitle>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2">
+                        <Moon className="h-5 w-5 text-blue-500" />
+                        Minimum Day Length
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="text-center">
                       <div className="text-4xl font-bold">{stats.minDayLength}</div>
@@ -278,10 +312,10 @@ const Visualize = () => {
                       <BarChart data={sortedData}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="location" />
-                        <YAxis />
-                        <Tooltip />
+                        <YAxis label={{ value: 'Minutes', angle: -90, position: 'insideLeft' }} />
+                        <Tooltip formatter={(value) => [`${value} minutes`, 'Day Length']} />
                         <Legend />
-                        <Bar dataKey="dayLength" fill="#8884d8" name="Day Length (minutes)" />
+                        <Bar dataKey="dayLength" fill="#8884d8" name="Day Length" />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
@@ -299,7 +333,7 @@ const Visualize = () => {
                             data={stats.sourceData}
                             cx="50%"
                             cy="50%"
-                            labelLine={true}
+                            labelLine={false}
                             label={({ name, percent }) => {
                               const percentValue = typeof percent === 'number' 
                                 ? `${(percent * 100).toFixed(0)}%` 
@@ -314,7 +348,7 @@ const Visualize = () => {
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip content={renderCustomTooltipContent} />
+                          <Tooltip />
                         </PieChart>
                       </ResponsiveContainer>
                     )}
@@ -335,7 +369,7 @@ const Visualize = () => {
                           type="number" 
                           dataKey="x" 
                           name="Latitude" 
-                          label={{ value: 'Latitude', position: 'bottom' }}
+                          label={{ value: 'Latitude (°N)', position: 'bottom' }}
                         />
                         <YAxis 
                           type="number" 
@@ -344,11 +378,16 @@ const Visualize = () => {
                           label={{ value: 'Day Length (min)', angle: -90, position: 'left' }}
                         />
                         <ZAxis type="number" range={[100, 100]} />
-                        <Tooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value, name, props) => {
-                          if (name === 'Latitude') return [value.toFixed(2), name];
-                          if (name === 'Day Length') return [Math.round(value), 'minutes'];
-                          return [value, name];
-                        }} />
+                        <Tooltip 
+                          cursor={{ strokeDasharray: '3 3' }} 
+                          formatter={(value, name) => {
+                            if (typeof value === 'number') {
+                              if (name === 'Latitude') return [value.toFixed(2), 'Latitude (°N)'];
+                              if (name === 'Day Length') return [Math.round(value), 'Minutes'];
+                            }
+                            return [value, name];
+                          }}
+                        />
                         <Scatter name="Locations" data={scatterData} fill="#8884d8" />
                       </ScatterChart>
                     </ResponsiveContainer>
@@ -365,10 +404,10 @@ const Visualize = () => {
                         <BarChart data={stats.locationStats}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="location" />
-                          <YAxis />
-                          <Tooltip />
+                          <YAxis label={{ value: 'Minutes', angle: -90, position: 'insideLeft' }} />
+                          <Tooltip formatter={(value) => [`${value} minutes`, 'Average Day Length']} />
                           <Legend />
-                          <Bar dataKey="avgDayLength" fill="#82ca9d" name="Avg Day Length (min)" />
+                          <Bar dataKey="avgDayLength" fill="#82ca9d" name="Avg Day Length" />
                         </BarChart>
                       </ResponsiveContainer>
                     )}
@@ -382,30 +421,60 @@ const Visualize = () => {
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-96">
-                    <table className="w-full border-collapse">
-                      <thead className="bg-gray-100 sticky top-0">
-                        <tr>
-                          <th className="p-2 text-left">Location</th>
-                          <th className="p-2 text-left">Date</th>
-                          <th className="p-2 text-left">Sunrise</th>
-                          <th className="p-2 text-left">Sunset</th>
-                          <th className="p-2 text-left">Day Length (min)</th>
-                          <th className="p-2 text-left">Source</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead onClick={() => handleSort("location")} className="cursor-pointer">
+                            <div className="flex items-center">
+                              Location
+                              <ArrowUpDown className="ml-1 h-4 w-4" />
+                            </div>
+                          </TableHead>
+                          <TableHead onClick={() => handleSort("date")} className="cursor-pointer">
+                            <div className="flex items-center">
+                              Date
+                              <ArrowUpDown className="ml-1 h-4 w-4" />
+                            </div>
+                          </TableHead>
+                          <TableHead onClick={() => handleSort("sunrise")} className="cursor-pointer">
+                            <div className="flex items-center">
+                              Sunrise
+                              <ArrowUpDown className="ml-1 h-4 w-4" />
+                            </div>
+                          </TableHead>
+                          <TableHead onClick={() => handleSort("sunset")} className="cursor-pointer">
+                            <div className="flex items-center">
+                              Sunset
+                              <ArrowUpDown className="ml-1 h-4 w-4" />
+                            </div>
+                          </TableHead>
+                          <TableHead onClick={() => handleSort("day_length")} className="cursor-pointer">
+                            <div className="flex items-center">
+                              Day Length (min)
+                              <ArrowUpDown className="ml-1 h-4 w-4" />
+                            </div>
+                          </TableHead>
+                          <TableHead onClick={() => handleSort("source")} className="cursor-pointer">
+                            <div className="flex items-center">
+                              Source
+                              <ArrowUpDown className="ml-1 h-4 w-4" />
+                            </div>
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
                         {sortedData.map((item, index) => (
-                          <tr key={index} className="border-b border-gray-200">
-                            <td className="p-2">{item.location}</td>
-                            <td className="p-2">{item.date}</td>
-                            <td className="p-2">{item.sunrise}</td>
-                            <td className="p-2">{item.sunset}</td>
-                            <td className="p-2">{item.dayLength}</td>
-                            <td className="p-2">{item.source}</td>
-                          </tr>
+                          <TableRow key={index}>
+                            <TableCell>{item.location}</TableCell>
+                            <TableCell>{item.date}</TableCell>
+                            <TableCell>{item.sunrise}</TableCell>
+                            <TableCell>{item.sunset}</TableCell>
+                            <TableCell>{item.dayLength}</TableCell>
+                            <TableCell>{item.source}</TableCell>
+                          </TableRow>
                         ))}
-                      </tbody>
-                    </table>
+                      </TableBody>
+                    </Table>
                   </ScrollArea>
                 </CardContent>
               </Card>
