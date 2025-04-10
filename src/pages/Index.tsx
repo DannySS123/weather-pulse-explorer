@@ -6,9 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import Header from "@/components/Header";
+import { getCoordinates } from "@/services/geocoding";
+import { fetchSunriseSunsetData } from "@/services/astronomicalData";
 
 const Index = () => {
   const [location, setLocation] = useState("");
+  const [date, setDate] = useState<Date>(new Date());
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -24,44 +33,42 @@ const Index = () => {
 
     setIsLoading(true);
     try {
-      // Get location coordinates (simplified for now)
-      // In a real app, we would use a geocoding API
-      const latitude = 40.7128; // Example: NYC
-      const longitude = -74.006;
+      // Get location coordinates using our geocoding service
+      const coordinates = getCoordinates(location);
       
-      // Fetch sunrise/sunset data from primary API
-      const sunriseResponse = await fetch(
-        `https://api.sunrise-sunset.org/json?lat=${latitude}&lng=${longitude}&formatted=0`
-      );
-      const sunriseData = await sunriseResponse.json();
-      
-      if (sunriseData.status !== "OK") {
-        throw new Error("Failed to fetch sunrise/sunset data");
+      if (!coordinates) {
+        throw new Error("Could not find coordinates for the given location");
       }
       
-      // Format the date
-      const today = new Date().toISOString().split('T')[0];
+      const { lat, lng } = coordinates;
       
-      // Calculate day length in seconds
-      const sunrise = new Date(sunriseData.results.sunrise);
-      const sunset = new Date(sunriseData.results.sunset);
-      const dayLengthSeconds = Math.floor((sunset.getTime() - sunrise.getTime()) / 1000);
+      // Format the selected date
+      const formattedDate = format(date, "yyyy-MM-dd");
+      
+      // Fetch astronomical data from APIs
+      const apiResponse = await fetchSunriseSunsetData(lat, lng, formattedDate);
+      
+      if (!apiResponse) {
+        throw new Error("Failed to fetch astronomical data");
+      }
+      
+      const { data: sunriseData, source } = apiResponse;
       
       // Prepare data for database
       const astronomicalData = {
         location: location,
-        latitude: latitude,
-        longitude: longitude,
-        date: today,
-        sunrise: sunriseData.results.sunrise,
-        sunset: sunriseData.results.sunset,
-        day_length: dayLengthSeconds,
-        solar_noon: sunriseData.results.solar_noon,
+        latitude: lat,
+        longitude: lng,
+        date: formattedDate,
+        sunrise: sunriseData.sunrise,
+        sunset: sunriseData.sunset,
+        day_length: sunriseData.day_length,
+        solar_noon: sunriseData.solar_noon,
         iss_passes: 0,  // Default value since API is not available
         iss_next_pass: null,
         people_in_space: 0,  // Default value since API is not available
         people_details: null,
-        source: "sunrise-sunset.org"
+        source: source
       };
       
       // Store in Supabase
@@ -92,70 +99,100 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md mx-auto">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-center">Astronomical Data Explorer</CardTitle>
-            <CardDescription className="text-center">
-              Search for astronomical data by location
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <Input
-                  placeholder="Enter a city name (e.g., New York)"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                />
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      <div className="py-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold text-center">Astronomical Data Explorer</CardTitle>
+              <CardDescription className="text-center">
+                Search for astronomical data by location and date
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Location</label>
+                  <Input
+                    placeholder="Enter a city name (e.g., New York)"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !date && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {date ? format(date, "PPP") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={date}
+                        onSelect={(newDate) => newDate && setDate(newDate)}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
+            </CardContent>
+            <CardFooter>
+              <Button 
+                className="w-full" 
+                onClick={fetchAstronomicalData}
+                disabled={isLoading}
+              >
+                {isLoading ? "Collecting Data..." : "Collect Astronomical Data"}
+              </Button>
+            </CardFooter>
+          </Card>
+          
+          <div className="mt-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Visualize Data</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-500">
+                    Explore collected astronomical data with interactive visualizations.
+                  </p>
+                </CardContent>
+                <CardFooter>
+                  <Button variant="outline" className="w-full" onClick={() => navigate("/visualize")}>
+                    View Visualizations
+                  </Button>
+                </CardFooter>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Conclusions</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-500">
+                    Discover insights and conclusions from the astronomical data.
+                  </p>
+                </CardContent>
+                <CardFooter>
+                  <Button variant="outline" className="w-full" onClick={() => navigate("/conclusions")}>
+                    View Conclusions
+                  </Button>
+                </CardFooter>
+              </Card>
             </div>
-          </CardContent>
-          <CardFooter>
-            <Button 
-              className="w-full" 
-              onClick={fetchAstronomicalData}
-              disabled={isLoading}
-            >
-              {isLoading ? "Collecting Data..." : "Collect Astronomical Data"}
-            </Button>
-          </CardFooter>
-        </Card>
-        
-        <div className="mt-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Visualize Data</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-500">
-                  Explore collected astronomical data with interactive visualizations.
-                </p>
-              </CardContent>
-              <CardFooter>
-                <Button variant="outline" className="w-full" onClick={() => navigate("/visualize")}>
-                  View Visualizations
-                </Button>
-              </CardFooter>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Conclusions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-500">
-                  Discover insights and conclusions from the astronomical data.
-                </p>
-              </CardContent>
-              <CardFooter>
-                <Button variant="outline" className="w-full" onClick={() => navigate("/conclusions")}>
-                  View Conclusions
-                </Button>
-              </CardFooter>
-            </Card>
           </div>
         </div>
       </div>

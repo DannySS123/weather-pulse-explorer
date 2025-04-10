@@ -2,16 +2,13 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
+import Header from "@/components/Header";
 
 const Conclusions = () => {
   const [astronomicalData, setAstronomicalData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [scoringMethod, setScoringMethod] = useState("dayLength");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,8 +20,7 @@ const Conclusions = () => {
     try {
       const { data, error } = await supabase
         .from("astronomical_data")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .select("*");
 
       if (error) throw error;
       
@@ -36,138 +32,116 @@ const Conclusions = () => {
     }
   };
 
-  // Calculate astronomical scores
-  const calculateScores = () => {
-    if (!astronomicalData.length) return [];
+  // Process the data to derive conclusions
+  const conclusions = () => {
+    if (astronomicalData.length === 0) return [];
 
-    return astronomicalData.map(item => {
-      // Calculate normalized score (0-100) based on the selected method
-      let score = 0;
-      if (scoringMethod === "dayLength") {
-        // Longer day length is better (max approx 43200 seconds or 12 hours)
-        score = (item.day_length / 43200) * 100;
-      } else if (scoringMethod === "combined") {
-        // Combined score - just use day length for now since we removed ISS passes
-        score = (item.day_length / 43200) * 100;
+    // Group data by location
+    const locationGroups = astronomicalData.reduce((groups, item) => {
+      const location = item.location;
+      if (!groups[location]) {
+        groups[location] = [];
       }
+      groups[location].push(item);
+      return groups;
+    }, {});
 
+    // Calculate average day length for each location
+    const locationScores = Object.entries(locationGroups).map(([location, items]) => {
+      const avgDayLength = items.reduce((sum, item) => sum + item.day_length, 0) / items.length;
+      
+      // Simple scoring method: higher day length = higher score
+      const score = avgDayLength / 60; // convert to minutes for easier reading
+      
       return {
-        location: item.location,
-        date: new Date(item.date).toLocaleDateString(),
-        score: Math.min(Math.round(score), 100), // Cap at 100
-        dayLength: Math.round(item.day_length / 60), // in minutes
-        source: item.source
+        location,
+        score: Math.round(score),
+        dayLength: Math.round(avgDayLength / 60),
+        samples: items.length
       };
-    }).sort((a, b) => b.score - a.score); // Sort by score descending
+    });
+
+    // Sort by score (descending)
+    return locationScores.sort((a, b) => b.score - a.score);
   };
 
-  const scores = calculateScores();
-  const bestLocation = scores.length > 0 ? scores[0] : null;
+  const conclusionsData = conclusions();
+  const bestLocation = conclusionsData.length > 0 ? conclusionsData[0] : null;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Astronomical Conclusions</h1>
-          <Button onClick={() => navigate("/")}>Back to Search</Button>
-        </div>
-
-        {isLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <p>Loading astronomical data...</p>
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      <div className="py-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold">Astronomical Data Conclusions</h1>
+            <Button onClick={() => navigate("/visualize")}>Back to Visualizations</Button>
           </div>
-        ) : astronomicalData.length === 0 ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="text-center">
-              <p className="mb-4">No astronomical data available for analysis.</p>
-              <Button onClick={() => navigate("/")}>Collect Data</Button>
+
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <p>Loading astronomical data...</p>
             </div>
-          </div>
-        ) : (
-          <>
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle>Scoring Method</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RadioGroup 
-                  value={scoringMethod} 
-                  onValueChange={setScoringMethod}
-                  className="flex flex-col space-y-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="dayLength" id="dayLength" />
-                    <Label htmlFor="dayLength">Day Length (longer days score higher)</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="combined" id="combined" />
-                    <Label htmlFor="combined">Combined Score (based on available metrics)</Label>
-                  </div>
-                </RadioGroup>
-              </CardContent>
-            </Card>
+          ) : astronomicalData.length === 0 ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-center">
+                <p className="mb-4">No astronomical data available for analysis.</p>
+                <Button onClick={() => navigate("/")}>Collect Data</Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {bestLocation && (
+                <Card className="mb-8 bg-primary/5 border-primary/20">
+                  <CardHeader>
+                    <CardTitle className="text-center">Best Location for Daylight</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-center">
+                    <h2 className="text-3xl font-bold mb-2">{bestLocation.location}</h2>
+                    <p className="text-lg">
+                      Average day length: <span className="font-semibold">{bestLocation.dayLength} minutes</span>
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Based on {bestLocation.samples} data samples
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
 
-            {bestLocation && (
-              <Card className="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-indigo-100">
+              <Card>
                 <CardHeader>
-                  <CardTitle className="text-xl text-center">Best Location for Astronomical Observation</CardTitle>
+                  <CardTitle>Location Rankings by Daylight</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center mb-4">
-                    <h3 className="text-2xl font-bold text-indigo-700">{bestLocation.location}</h3>
-                    <p className="text-gray-600">Date: {bestLocation.date}</p>
-                    <p className="text-gray-600">Source: {bestLocation.source}</p>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <span className="font-medium">Overall Score</span>
-                        <span className="font-medium">{bestLocation.score}%</span>
-                      </div>
-                      <Progress value={bestLocation.score} className="h-2" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                      <div className="bg-white p-4 rounded-lg shadow-sm">
-                        <p className="text-gray-500 text-sm">Day Length</p>
-                        <p className="text-lg font-semibold">{bestLocation.dayLength} minutes</p>
-                      </div>
-                    </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="p-2 text-left">Rank</th>
+                          <th className="p-2 text-left">Location</th>
+                          <th className="p-2 text-left">Average Day Length</th>
+                          <th className="p-2 text-left">Score</th>
+                          <th className="p-2 text-left">Samples</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {conclusionsData.map((item, index) => (
+                          <tr key={item.location} className={`border-b ${index === 0 ? 'bg-primary/5' : ''}`}>
+                            <td className="p-2 font-medium">{index + 1}</td>
+                            <td className="p-2">{item.location}</td>
+                            <td className="p-2">{item.dayLength} minutes</td>
+                            <td className="p-2">{item.score}</td>
+                            <td className="p-2">{item.samples}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </CardContent>
               </Card>
-            )}
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Location Rankings</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {scores.map((item, index) => (
-                    <div key={index} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <div>
-                          <h3 className="font-medium">{index + 1}. {item.location}</h3>
-                          <p className="text-sm text-gray-500">{item.date}</p>
-                        </div>
-                        <span className="font-bold">{item.score}%</span>
-                      </div>
-                      <Progress value={item.score} className="h-2 mb-2" />
-                      <div className="grid grid-cols-2 gap-2 text-sm mt-2">
-                        <div className="text-gray-600">
-                          Day Length: {item.dayLength} min
-                        </div>
-                        <div className="text-gray-600">
-                          Data Source: {item.source}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
