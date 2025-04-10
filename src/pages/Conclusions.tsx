@@ -6,8 +6,29 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 
+interface AstronomicalDataItem {
+  id: string;
+  location: string;
+  latitude: number;
+  longitude: number;
+  date: string;
+  sunrise: string;
+  sunset: string;
+  day_length: number;
+  solar_noon: string;
+  source: string;
+  created_at: string;
+}
+
+interface LocationScore {
+  location: string;
+  score: number;
+  dayLength: number;
+  samples: number;
+}
+
 const Conclusions = () => {
-  const [astronomicalData, setAstronomicalData] = useState([]);
+  const [astronomicalData, setAstronomicalData] = useState<AstronomicalDataItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -33,7 +54,7 @@ const Conclusions = () => {
   };
 
   // Process the data to derive conclusions
-  const conclusions = () => {
+  const conclusions = (): LocationScore[] => {
     if (astronomicalData.length === 0) return [];
 
     // Group data by location
@@ -44,7 +65,7 @@ const Conclusions = () => {
       }
       groups[location].push(item);
       return groups;
-    }, {});
+    }, {} as Record<string, AstronomicalDataItem[]>);
 
     // Calculate average day length for each location
     const locationScores = Object.entries(locationGroups).map(([location, items]) => {

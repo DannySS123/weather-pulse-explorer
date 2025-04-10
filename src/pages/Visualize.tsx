@@ -1,11 +1,10 @@
-
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
-  BarChart, Bar, PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis 
+  BarChart, Bar, PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis, TooltipProps
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -30,6 +29,42 @@ interface AstronomicalData {
   solar_noon: string;
   source: string;
   created_at: string;
+}
+
+interface ProcessedData {
+  location: string;
+  date: string;
+  dayLength: number;
+  sunrise: string;
+  sunset: string;
+  latitude: number;
+  longitude: number;
+  source: string;
+}
+
+interface LocationStat {
+  location: string;
+  avgDayLength: number;
+}
+
+interface SourceData {
+  name: string;
+  value: number;
+}
+
+interface Stats {
+  avgDayLength: number;
+  maxDayLength: number;
+  minDayLength: number;
+  locationStats: LocationStat[];
+  sourceData: SourceData[];
+}
+
+interface ScatterDataPoint {
+  x: number;
+  y: number;
+  z: number;
+  name: string;
 }
 
 const Visualize = () => {
@@ -60,7 +95,6 @@ const Visualize = () => {
     }
   };
 
-  // Process data for visualizations
   const processedData = useMemo(() => {
     if (!astronomicalData.length) return [];
     
@@ -76,7 +110,6 @@ const Visualize = () => {
     }));
   }, [astronomicalData]);
 
-  // Calculate averages and extremes
   const stats = useMemo(() => {
     if (!astronomicalData.length) return null;
     
@@ -87,7 +120,6 @@ const Visualize = () => {
     const maxDayLength = Math.round(Math.max(...dayLengths));
     const minDayLength = Math.round(Math.min(...dayLengths));
     
-    // Group by location to find averages per city
     const locationGroups = astronomicalData.reduce((groups, item) => {
       const location = item.location;
       if (!groups[location]) {
@@ -104,7 +136,6 @@ const Visualize = () => {
       return { location, avgDayLength: avgDayLengthForLocation };
     });
     
-    // Group by source
     const sourceGroups = astronomicalData.reduce((groups, item) => {
       const source = item.source;
       if (!groups[source]) {
@@ -125,7 +156,6 @@ const Visualize = () => {
     };
   }, [astronomicalData]);
 
-  // Sort data based on user selection
   const sortedData = useMemo(() => {
     if (!processedData.length) return [];
     
@@ -137,7 +167,6 @@ const Visualize = () => {
     });
   }, [processedData, sortBy]);
 
-  // Generate scatter plot data for latitude vs. day length
   const scatterData = useMemo(() => {
     if (!astronomicalData.length) return [];
     
@@ -149,8 +178,28 @@ const Visualize = () => {
     }));
   }, [astronomicalData]);
 
-  // Colors for pie chart
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+
+  const renderCustomTooltipContent = (props: TooltipProps) => {
+    const { payload } = props;
+    if (!payload || payload.length === 0) return null;
+    
+    const data = payload[0];
+    if (!data || !data.payload) return null;
+    
+    const name = data.name;
+    const value = data.value;
+    
+    const percent = typeof data.percent === 'number' 
+      ? (data.percent * 100).toFixed(0) 
+      : '0';
+    
+    return (
+      <div className="bg-white p-2 shadow rounded">
+        <p>{`${name}: ${percent}%`}</p>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -251,7 +300,12 @@ const Visualize = () => {
                             cx="50%"
                             cy="50%"
                             labelLine={true}
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                            label={({ name, percent }) => {
+                              const percentValue = typeof percent === 'number' 
+                                ? `${(percent * 100).toFixed(0)}%` 
+                                : '0%';
+                              return `${name}: ${percentValue}`;
+                            }}
                             outerRadius={80}
                             fill="#8884d8"
                             dataKey="value"
@@ -260,7 +314,7 @@ const Visualize = () => {
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip />
+                          <Tooltip content={renderCustomTooltipContent} />
                         </PieChart>
                       </ResponsiveContainer>
                     )}
