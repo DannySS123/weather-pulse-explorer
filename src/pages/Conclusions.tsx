@@ -10,15 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
-import { ArrowUpDown, Sun, MapPin, TrendingUp, Calendar } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { MapPin, TrendingUp, Calendar } from "lucide-react";
 
 interface AstronomicalDataItem {
   id: string;
@@ -65,8 +57,6 @@ const Conclusions = () => {
     AstronomicalDataItem[]
   >([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<SortableColumn>("score");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -89,76 +79,6 @@ const Conclusions = () => {
       setIsLoading(false);
     }
   };
-
-  // Process the data to derive conclusions
-  const conclusions = (): LocationScore[] => {
-    if (astronomicalData.length === 0) return [];
-
-    // Group data by location
-    const locationGroups = astronomicalData.reduce((groups, item) => {
-      const location = item.location;
-      if (!groups[location]) {
-        groups[location] = [];
-      }
-      groups[location].push(item);
-      return groups;
-    }, {} as Record<string, AstronomicalDataItem[]>);
-
-    // Calculate average day length for each location
-    const locationScores = Object.entries(locationGroups).map(
-      ([location, items]) => {
-        const avgDayLength =
-          items.reduce((sum, item) => sum + item.day_length, 0) / items.length;
-
-        // Simple scoring method: higher day length = higher score
-        const score = avgDayLength / 60; // convert to minutes for easier reading
-
-        return {
-          location,
-          score: Math.round(score),
-          dayLength: Math.round(avgDayLength / 60),
-          samples: items.length,
-        };
-      }
-    );
-
-    return locationScores;
-  };
-
-  // Handle sorting
-  const handleSort = (column: SortableColumn) => {
-    if (sortBy === column) {
-      // Toggle sort order if clicking the same column
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      // Set new column and default to descending for most metrics
-      setSortBy(column);
-      setSortOrder(column === "location" ? "asc" : "desc");
-    }
-  };
-
-  // Apply sorting
-  const sortedConclusionsData = (): LocationScore[] => {
-    const data = conclusions();
-
-    if (data.length === 0) return [];
-
-    return [...data].sort((a, b) => {
-      let comparison = 0;
-
-      if (sortBy === "location")
-        comparison = a.location.localeCompare(b.location);
-      else if (sortBy === "dayLength") comparison = a.dayLength - b.dayLength;
-      else if (sortBy === "score") comparison = a.score - b.score;
-      else if (sortBy === "samples") comparison = a.samples - b.samples;
-
-      // Reverse for descending order
-      return sortOrder === "asc" ? comparison : -comparison;
-    });
-  };
-
-  const conclusionsData = sortedConclusionsData();
-  const bestLocation = conclusionsData.length > 0 ? conclusionsData[0] : null;
 
   // New calculation for latitude correlation with day length
   const latitudeInsight = useMemo((): LatitudeInsight | null => {
