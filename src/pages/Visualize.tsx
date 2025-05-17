@@ -1,10 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -24,14 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
-import { Input } from "@/components/ui/input"; // Add this import
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -41,6 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Sun, Moon, ArrowUpDown } from "lucide-react";
+import { getAstronomicalData } from "@/services/getAstronomicalData";
 
 interface AstronomicalData {
   id: string;
@@ -56,17 +47,6 @@ interface AstronomicalData {
   created_at: string;
 }
 
-interface ProcessedData {
-  location: string;
-  date: string;
-  dayLength: number;
-  sunrise: string;
-  sunset: string;
-  latitude: number;
-  longitude: number;
-  source: string;
-}
-
 interface LocationStat {
   location: string;
   avgDayLength: number;
@@ -75,21 +55,6 @@ interface LocationStat {
 interface SourceData {
   name: string;
   value: number;
-}
-
-interface Stats {
-  avgDayLength: number;
-  maxDayLength: number;
-  minDayLength: number;
-  locationStats: LocationStat[];
-  sourceData: SourceData[];
-}
-
-interface ScatterDataPoint {
-  x: number;
-  y: number;
-  z: number;
-  name: string;
 }
 
 type SortableColumn =
@@ -117,11 +82,7 @@ const Visualize = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("astronomical_data")
-        .select("*")
-        .order("created_at", { ascending: false });
-
+      const { data, error } = await getAstronomicalData();
       if (error) throw error;
 
       setAstronomicalData((data as AstronomicalData[]) || []);
@@ -156,11 +117,9 @@ const Visualize = () => {
     }));
   }, [astronomicalData]);
 
-  // Add this to your sortedData useMemo to apply the filter
   const sortedData = useMemo(() => {
     if (!processedData.length) return [];
 
-    // Filter by city name first
     const filteredData = processedData.filter(
       (item) =>
         cityFilter === "" ||
@@ -186,11 +145,9 @@ const Visualize = () => {
     });
   }, [processedData, sortBy, sortOrder, cityFilter]);
 
-  // Update other useMemo hooks to use the city filter
   const stats = useMemo(() => {
     if (!astronomicalData.length) return null;
 
-    // Filter by city name first if a filter is applied
     const filteredData = cityFilter
       ? astronomicalData.filter((item) =>
           item.location.toLowerCase().includes(cityFilter.toLowerCase())
@@ -255,7 +212,6 @@ const Visualize = () => {
   const scatterData = useMemo(() => {
     if (!astronomicalData.length) return [];
 
-    // Apply city filter
     const filteredData = cityFilter
       ? astronomicalData.filter((item) =>
           item.location.toLowerCase().includes(cityFilter.toLowerCase())
@@ -263,9 +219,9 @@ const Visualize = () => {
       : astronomicalData;
 
     return filteredData.map((item) => ({
-      x: item.latitude, // latitude
-      y: item.day_length / 60, // day length in minutes
-      z: 1, // size (constant)
+      x: item.latitude,
+      y: item.day_length / 60,
+      z: 1,
       name: item.location,
     }));
   }, [astronomicalData, cityFilter]);
@@ -281,19 +237,15 @@ const Visualize = () => {
     const data = payload[0];
     if (!data || !data.payload) return null;
 
-    const name = data.name;
-    const value = data.value;
-
-    let percentText = "0%";
-    if (typeof data.payload.percent === "number") {
-      percentText = `${(data.payload.percent * 100).toFixed(0)}%`;
-    } else if (data.payload.percent !== undefined) {
-      percentText = String(data.payload.percent);
-    }
+    const name = data.payload.name;
+    const value = data.payload.value;
+    const total =
+      stats?.sourceData.reduce((sum, item) => sum + item.value, 0) || 1;
+    const percent = ((value / total) * 100).toFixed(0) + "%";
 
     return (
       <div className="bg-white p-2 shadow rounded">
-        <p>{`${name}: ${percentText}`}</p>
+        <p>{`${name}: ${percent}`}</p>
       </div>
     );
   };
@@ -315,7 +267,6 @@ const Visualize = () => {
             </div>
           </div>
 
-          {/* Add the city filter input */}
           {!isLoading && astronomicalData.length > 0 && (
             <div className="mb-6">
               <div className="w-full max-w-sm">
