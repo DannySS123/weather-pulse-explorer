@@ -84,21 +84,18 @@ export const fetchAstronimicalData = async (
     console.error("Error fetching data from sunrise-sunset.org API:", error);
   }
 
-  // Process sunrisesunset.io API response (separately so one failure doesn't affect the other)
+  // Process sunrisesunset.io API response
   try {
     const response = await sunriseSunsetIoPromise;
 
     if (response.ok) {
       const data = (await response.json()) as SunriseSunsetIoApiResponse;
-
       if (data.status === "OK") {
-        // Convert day_length from "HH:MM:SS" to seconds
         const [hours, minutes, seconds] = data.results.day_length
           .split(":")
           .map(Number);
         const dayLengthSeconds = hours * 3600 + minutes * 60 + seconds;
 
-        // Helper function to parse "hh:mm:ss AM/PM" to Date using base date
         const parseTime = (baseDateStr, timeStr) => {
           const [timePart, modifier] = timeStr.split(" ");
           // eslint-disable-next-line prefer-const
@@ -114,16 +111,14 @@ export const fetchAstronimicalData = async (
 
         const dateStr = data.results.date; // "2010-05-04"
 
-        // Parse time values
         const sunriseDate = parseTime(dateStr, data.results.sunrise);
         const sunsetDate = parseTime(dateStr, data.results.sunset);
         const solarNoonDate = parseTime(dateStr, data.results.solar_noon);
 
-        // Apply utc_offset (in minutes)
         const offsetMs = data.results.utc_offset * 60 * 1000;
-        sunriseDate.setTime(sunriseDate.getTime() + offsetMs);
-        sunsetDate.setTime(sunsetDate.getTime() + offsetMs);
-        solarNoonDate.setTime(solarNoonDate.getTime() + offsetMs);
+        sunriseDate.setTime(sunriseDate.getTime() - offsetMs);
+        sunsetDate.setTime(sunsetDate.getTime() - offsetMs);
+        solarNoonDate.setTime(solarNoonDate.getTime() - offsetMs);
 
         results.push({
           data: {
