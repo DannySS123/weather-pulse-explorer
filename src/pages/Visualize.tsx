@@ -56,22 +56,6 @@ interface AstronomicalData {
   created_at: string;
 }
 
-interface FilteredData {
-  location: string;
-  date: string;
-  dayLength: number;
-  sunrise: string;
-  sunset: string;
-  latitude: number;
-  longitude: number;
-  source: string;
-}
-
-interface SourceData {
-  name: string;
-  value: number;
-}
-
 type SortableColumn =
   | "location"
   | "date"
