@@ -6,11 +6,18 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
-import { MapPin, TrendingUp, Calendar } from "lucide-react";
+import {
+  MapPin,
+  TrendingUp,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 
 interface AstronomicalDataItem {
   id: string;
@@ -55,6 +62,7 @@ const Conclusions = () => {
     AstronomicalDataItem[]
   >([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showAllTrends, setShowAllTrends] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -235,6 +243,16 @@ const Conclusions = () => {
       .sort((a, b) => Math.abs(b.changeRate) - Math.abs(a.changeRate));
   }, [astronomicalData]);
 
+  // Function to toggle showing all trends
+  const toggleTrendDisplay = () => {
+    setShowAllTrends(!showAllTrends);
+  };
+
+  // Determine which trends to display
+  const trendsToDisplay = useMemo(() => {
+    return showAllTrends ? locationTrends : locationTrends.slice(0, 3);
+  }, [locationTrends, showAllTrends]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -309,7 +327,7 @@ const Conclusions = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {locationTrends.map((item) => (
+                      {trendsToDisplay.map((item) => (
                         <div
                           key={item.location}
                           className="border-b pb-3 last:border-b-0"
@@ -348,6 +366,28 @@ const Conclusions = () => {
                       ))}
                     </div>
                   </CardContent>
+                  {locationTrends.length > 3 && (
+                    <CardFooter className="px-6 py-3 flex justify-center border-t border-green-200">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={toggleTrendDisplay}
+                        className="text-green-700 hover:text-green-800 hover:bg-green-100 flex items-center gap-1"
+                      >
+                        {showAllTrends ? (
+                          <>
+                            <ChevronUp className="h-4 w-4" />
+                            Show Less
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-4 w-4" />
+                            Show All ({locationTrends.length - 3} More)
+                          </>
+                        )}
+                      </Button>
+                    </CardFooter>
+                  )}
                 </Card>
               )}
 
