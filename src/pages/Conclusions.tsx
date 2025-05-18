@@ -33,8 +33,6 @@ interface LocationScore {
   samples: number;
 }
 
-type SortableColumn = "rank" | "location" | "dayLength" | "score" | "samples";
-
 interface LatitudeInsight {
   correlation: number;
   description: string;
@@ -80,15 +78,12 @@ const Conclusions = () => {
     }
   };
 
-  // New calculation for latitude correlation with day length
   const latitudeInsight = useMemo((): LatitudeInsight | null => {
     if (astronomicalData.length < 3) return null;
 
-    // Calculate correlation between latitude and day length
     const latitudes = astronomicalData.map((item) => item.latitude);
     const dayLengths = astronomicalData.map((item) => item.day_length / 60);
 
-    // Calculate correlation coefficient
     const n = latitudes.length;
     const sumX = latitudes.reduce((a, b) => a + b, 0);
     const sumY = dayLengths.reduce((a, b) => a + b, 0);
@@ -127,11 +122,9 @@ const Conclusions = () => {
     };
   }, [astronomicalData]);
 
-  // Determine seasonal patterns
   const seasonalPatterns = useMemo((): SeasonalPattern[] => {
     if (astronomicalData.length === 0) return [];
 
-    // Group data by month
     const monthGroups: Record<string, AstronomicalDataItem[]> = {};
 
     astronomicalData.forEach((item) => {
@@ -148,7 +141,6 @@ const Conclusions = () => {
       monthGroups[season].push(item);
     });
 
-    // Calculate average day length for each season
     return Object.entries(monthGroups)
       .map(([season, items]) => {
         const avgDayLength = Math.round(
@@ -157,7 +149,6 @@ const Conclusions = () => {
             60
         );
 
-        // Find top locations for this season
         const locationCounts: Record<string, number> = {};
         const locationTotals: Record<string, number> = {};
 
@@ -170,7 +161,6 @@ const Conclusions = () => {
           locationTotals[item.location] += item.day_length;
         });
 
-        // Get top 3 locations by average day length
         const locationAvgs = Object.entries(locationTotals).map(
           ([loc, total]) => ({
             location: loc,
@@ -198,11 +188,9 @@ const Conclusions = () => {
       });
   }, [astronomicalData]);
 
-  // Calculate day length trends for locations with multiple data points
   const locationTrends = useMemo((): LocationTrend[] => {
     if (astronomicalData.length === 0) return [];
 
-    // Group data by location
     const locationGroups = astronomicalData.reduce((groups, item) => {
       const location = item.location;
       if (!groups[location]) {
@@ -212,16 +200,13 @@ const Conclusions = () => {
       return groups;
     }, {} as Record<string, AstronomicalDataItem[]>);
 
-    // Only consider locations with multiple dates
     return Object.entries(locationGroups)
       .filter(([_, items]) => items.length > 1)
       .map(([location, items]) => {
-        // Sort by date
         items.sort(
           (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
         );
 
-        // Calculate day-over-day change
         let totalChange = 0;
         for (let i = 1; i < items.length; i++) {
           const prevDayLength = items[i - 1].day_length / 60;

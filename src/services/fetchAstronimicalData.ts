@@ -34,7 +34,7 @@ interface SunriseSunsetIoApiResponse {
   status: string;
 }
 
-interface AstronomicalDataResult {
+export interface AstronomicalDataResult {
   data: {
     sunrise: string;
     sunset: string;
@@ -44,7 +44,7 @@ interface AstronomicalDataResult {
   source: string;
 }
 
-export const fetchSunriseSunsetData = async (
+export const fetchAstronimicalData = async (
   latitude: number,
   longitude: number,
   date: string
@@ -82,7 +82,6 @@ export const fetchSunriseSunsetData = async (
     }
   } catch (error) {
     console.error("Error fetching data from sunrise-sunset.org API:", error);
-    // Don't return here, continue with the other API
   }
 
   // Process sunrisesunset.io API response (separately so one failure doesn't affect the other)
@@ -139,7 +138,6 @@ export const fetchSunriseSunsetData = async (
     }
   } catch (error) {
     console.error("Error fetching data from sunrisesunset.io API:", error);
-    // Don't return here either
   }
 
   if (results.length === 0) {

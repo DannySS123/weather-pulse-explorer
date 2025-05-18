@@ -23,9 +23,10 @@ import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Header from "@/components/Header";
 import { getCoordinates } from "@/services/geocoding";
-import { fetchSunriseSunsetData } from "@/services/astronomicalData";
+import { fetchAstronimicalData } from "@/services/fetchAstronimicalData";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { saveAstronomicalData } from "@/services/saveAstronomicalData";
 
 const Index = () => {
   const [location, setLocation] = useState("");
@@ -51,8 +52,7 @@ const Index = () => {
     setProgress(0);
 
     try {
-      // Get location coordinates using our geocoding service
-      const coordinates = getCoordinates(location);
+      const coordinates = await getCoordinates(location);
 
       if (!coordinates) {
         throw new Error("Could not find coordinates for the given location");
@@ -60,13 +60,11 @@ const Index = () => {
 
       const { lat, lng } = coordinates;
 
-      // Determine which dates to process
       let datesToProcess: Date[];
 
       if (dateMode === "single") {
         datesToProcess = [date];
       } else {
-        // For range mode, get all dates in the interval
         if (dateFrom > dateTo) {
           throw new Error("Start date must be before end date");
         }
@@ -76,7 +74,6 @@ const Index = () => {
           end: dateTo,
         });
 
-        // Limit to 30 days maximum to prevent excessive API calls
         if (datesToProcess.length > 30) {
           toast({
             title: "Warning",
@@ -87,17 +84,13 @@ const Index = () => {
         }
       }
 
-      // Set up progress tracking
       let completedDates = 0;
       const totalDates = datesToProcess.length;
 
-      // Process each date
       for (const currentDate of datesToProcess) {
-        // Format the current date
         const formattedDate = format(currentDate, "yyyy-MM-dd");
 
-        // Fetch astronomical data from APIs
-        const apiResponses = await fetchSunriseSunsetData(
+        const apiResponses = await fetchAstronimicalData(
           lat,
           lng,
           formattedDate
@@ -105,37 +98,17 @@ const Index = () => {
 
         if (!apiResponses || apiResponses.length === 0) {
           console.warn(`Failed to fetch data for ${formattedDate}`);
-          continue; // Skip to the next date
+          continue;
         }
 
-        // Store each API result separately in the database
-        for (const response of apiResponses) {
-          const astronomicalData = {
-            location: location,
-            latitude: lat,
-            longitude: lng,
-            date: formattedDate,
-            sunrise: response.data.sunrise,
-            sunset: response.data.sunset,
-            day_length: response.data.day_length,
-            solar_noon: response.data.solar_noon,
-            iss_passes: 0, // Default value since API is not available
-            iss_next_pass: null,
-            people_in_space: 0, // Default value since API is not available
-            people_details: null,
-            source: response.source,
-          };
+        await saveAstronomicalData(
+          apiResponses,
+          location,
+          lat,
+          lng,
+          formattedDate
+        );
 
-          const { error } = await supabase
-            .from("astronomical_data")
-            .insert([astronomicalData]);
-
-          if (error) {
-            console.error(`Error saving ${response.source} data:`, error);
-          }
-        }
-
-        // Update progress
         completedDates++;
         setProgress(Math.floor((completedDates / totalDates) * 100));
       }
@@ -145,7 +118,6 @@ const Index = () => {
         description: `Collected astronomical data for ${datesToProcess.length} date(s) successfully!`,
       });
 
-      // Navigate to visualization page
       //navigate("/visualize");
     } catch (error) {
       console.error("Error fetching data:", error);
