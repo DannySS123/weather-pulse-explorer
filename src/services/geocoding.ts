@@ -52,7 +52,6 @@ export const getCoordinates = async (
         lat: parseFloat(data[0].lat),
         lng: parseFloat(data[0].lon),
       };
-      console.log("Fetched coordinates:", coords);
 
       return coords;
     }

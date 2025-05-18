@@ -22,6 +22,15 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format, isBefore, isAfter, parseISO } from "date-fns";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -30,7 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Sun, Moon, ArrowUpDown } from "lucide-react";
+import { Sun, Moon, ArrowUpDown, FilterX } from "lucide-react";
 import { getAstronomicalData } from "@/services/getAstronomicalData";
 
 interface AstronomicalData {
@@ -47,9 +56,15 @@ interface AstronomicalData {
   created_at: string;
 }
 
-interface LocationStat {
+interface FilteredData {
   location: string;
-  avgDayLength: number;
+  date: string;
+  dayLength: number;
+  sunrise: string;
+  sunset: string;
+  latitude: number;
+  longitude: number;
+  source: string;
 }
 
 interface SourceData {
@@ -72,7 +87,9 @@ const Visualize = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [sortBy, setSortBy] = useState<SortableColumn>("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [cityFilter, setCityFilter] = useState<string>(""); // Add this state
+  const [cityFilter, setCityFilter] = useState<string>("");
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -102,6 +119,57 @@ const Visualize = () => {
     }
   };
 
+  const handleClearFilters = () => {
+    setCityFilter("");
+    setStartDate(undefined);
+    setEndDate(undefined);
+  };
+
+  const isSameDay = (date1: Date, date2: Date) => {
+    return (
+      date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate()
+    );
+  };
+
+  function applyFilters<T extends { location: string; date: string }>(
+    data: T[]
+  ): T[] {
+    let filteredData = data;
+    if (cityFilter) {
+      filteredData = filteredData.filter((item) =>
+        item.location.toLowerCase().includes(cityFilter.toLowerCase())
+      );
+    }
+
+    if (startDate || endDate) {
+      filteredData = filteredData.filter((item) => {
+        const itemDate = new Date(item.date);
+
+        if (
+          startDate &&
+          !isAfter(itemDate, startDate) &&
+          !isSameDay(itemDate, startDate)
+        ) {
+          return false;
+        }
+
+        // Check if date is before end date (if set)
+        if (
+          endDate &&
+          !isBefore(itemDate, endDate) &&
+          !isSameDay(itemDate, endDate)
+        ) {
+          return false;
+        }
+
+        return true;
+      });
+    }
+    return filteredData;
+  }
+
   const processedData = useMemo(() => {
     if (!astronomicalData.length) return [];
 
@@ -120,11 +188,7 @@ const Visualize = () => {
   const sortedData = useMemo(() => {
     if (!processedData.length) return [];
 
-    const filteredData = processedData.filter(
-      (item) =>
-        cityFilter === "" ||
-        item.location.toLowerCase().includes(cityFilter.toLowerCase())
-    );
+    const filteredData = applyFilters(processedData);
 
     return [...filteredData].sort((a, b) => {
       let comparison = 0;
@@ -143,16 +207,12 @@ const Visualize = () => {
 
       return sortOrder === "asc" ? comparison : -comparison;
     });
-  }, [processedData, sortBy, sortOrder, cityFilter]);
+  }, [processedData, sortBy, sortOrder, cityFilter, startDate, endDate]);
 
   const stats = useMemo(() => {
     if (!astronomicalData.length) return null;
 
-    const filteredData = cityFilter
-      ? astronomicalData.filter((item) =>
-          item.location.toLowerCase().includes(cityFilter.toLowerCase())
-        )
-      : astronomicalData;
+    const filteredData = applyFilters(astronomicalData);
 
     if (filteredData.length === 0) return null;
 
@@ -207,16 +267,12 @@ const Visualize = () => {
       locationStats,
       sourceData,
     };
-  }, [astronomicalData, cityFilter]);
+  }, [astronomicalData, cityFilter, startDate, endDate]);
 
   const scatterData = useMemo(() => {
     if (!astronomicalData.length) return [];
 
-    const filteredData = cityFilter
-      ? astronomicalData.filter((item) =>
-          item.location.toLowerCase().includes(cityFilter.toLowerCase())
-        )
-      : astronomicalData;
+    const filteredData = applyFilters(astronomicalData);
 
     return filteredData.map((item) => ({
       x: item.latitude,
@@ -224,7 +280,7 @@ const Visualize = () => {
       z: 1,
       name: item.location,
     }));
-  }, [astronomicalData, cityFilter]);
+  }, [astronomicalData, cityFilter, startDate, endDate]);
 
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
 
@@ -269,15 +325,134 @@ const Visualize = () => {
 
           {!isLoading && astronomicalData.length > 0 && (
             <div className="mb-6">
-              <div className="w-full max-w-sm">
-                <Input
-                  type="text"
-                  placeholder="Filter by location..."
-                  value={cityFilter}
-                  onChange={(e) => setCityFilter(e.target.value)}
-                  className="w-full"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Filter by Location
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Enter city name..."
+                    value={cityFilter}
+                    onChange={(e) => setCityFilter(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Start Date
+                    </label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !startDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {startDate ? (
+                            format(startDate, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={startDate}
+                          onSelect={setStartDate}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      End Date
+                    </label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !endDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {endDate ? (
+                            format(endDate, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={endDate}
+                          onSelect={setEndDate}
+                          disabled={
+                            startDate
+                              ? (date) => isBefore(date, startDate)
+                              : undefined
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={handleClearFilters}
+                    className="flex items-center gap-1"
+                    disabled={!cityFilter && !startDate && !endDate}
+                  >
+                    <FilterX className="h-4 w-4" />
+                    Clear Filters
+                  </Button>
+                </div>
               </div>
+
+              {/* Add filter summary */}
+              {(cityFilter || startDate || endDate) && (
+                <div className="mt-2 text-sm text-muted-foreground">
+                  Filtering:
+                  {cityFilter && (
+                    <span className="font-medium">
+                      {" "}
+                      Location contains "{cityFilter}"
+                    </span>
+                  )}
+                  {cityFilter && (startDate || endDate) && <span> and</span>}
+                  {startDate && (
+                    <span className="font-medium">
+                      {" "}
+                      From {format(startDate, "PPP")}
+                    </span>
+                  )}
+                  {startDate && endDate && <span> to</span>}
+                  {endDate && (
+                    <span className="font-medium">
+                      {" "}
+                      {format(endDate, "PPP")}
+                    </span>
+                  )}
+                  {" — "}
+                  <span className="font-medium">
+                    {sortedData.length} results
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
